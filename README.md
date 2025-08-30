@@ -1,0 +1,1 @@
+A Flask app with a form where a user can enter a topic. When submitted, a Celery task is triggered to scrape academic websites (like ArXiv or PubMed) for papers on that topic. Once the papers are collected, the task can use a library to generate a brief summary of each paper. The user is notified when the results are ready to be viewed on the web page.
