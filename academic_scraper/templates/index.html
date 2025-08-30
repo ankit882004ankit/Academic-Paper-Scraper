@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Academic Paper Scraper & Summarizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex items-center justify-center p-4">
+
+    <div class="w-full max-w-2xl bg-slate-800 p-8 rounded-xl shadow-lg">
+        <h1 class="text-3xl font-bold text-center mb-6">Academic Paper Summarizer</h1>
+        <p class="text-slate-400 text-center mb-8">
+            Enter a topic below to scrape academic papers and get a brief summary of each.
+            This task runs in the background.
+        </p>
+
+        <form id="search-form" class="space-y-4">
+            <input type="text" id="topic-input" name="topic" placeholder="e.g., 'Quantum Computing' or 'Machine Learning'"
+                   class="w-full px-4 py-3 rounded-md bg-slate-700 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <button type="submit"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800">
+                Start Scraping
+            </button>
+        </form>
+        
+        <div id="status-container" class="mt-8 hidden">
+            <div class="bg-blue-900 p-4 rounded-md text-sm text-blue-200">
+                <p>Task ID: <span id="task-id"></span></p>
+                <p id="task-status" class="mt-2 font-medium">Status: Pending...</p>
+            </div>
+        </div>
+
+        <div id="results-container" class="mt-8 space-y-6 hidden">
+            <h2 class="text-2xl font-semibold">Summarized Papers</h2>
+        </div>
+
+    </div>
+
+    <script>
+        document.getElementById('search-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const topic = document.getElementById('topic-input').value;
+            const form = new FormData();
+            form.append('topic', topic);
+
+            // Hide old results and show status container
+            document.getElementById('status-container').classList.remove('hidden');
+            document.getElementById('results-container').classList.add('hidden');
+            document.getElementById('task-status').textContent = "Status: Submitting task...";
+            
+            fetch('/submit', {
+                method: 'POST',
+                body: form
+            })
+            .then(response => response.json())
+            .then(data => {
+                const taskId = data.task_id;
+                document.getElementById('task-id').textContent = taskId;
+                
+                // Start polling for task status
+                const pollInterval = setInterval(() => {
+                    fetch(`/status/${taskId}`)
+                    .then(res => res.json())
+                    .then(statusData => {
+                        document.getElementById('task-status').textContent = `Status: ${statusData.status}`;
+                        if (statusData.status === 'ready') {
+                            clearInterval(pollInterval);
+                            displayResults(statusData.result.papers);
+                            document.getElementById('results-container').classList.remove('hidden');
+                        }
+                    })
+                    .catch(err => {
+                        clearInterval(pollInterval);
+                        document.getElementById('task-status').textContent = `Error: ${err.message}`;
+                        console.error('Error polling status:', err);
+                    });
+                }, 3000); // Poll every 3 seconds
+            })
+            .catch(err => {
+                document.getElementById('task-status').textContent = `Error: ${err.message}`;
+                console.error('Error submitting form:', err);
+            });
+        });
+        
+        function displayResults(papers) {
+            const container = document.getElementById('results-container');
+            container.innerHTML = `<h2 class="text-2xl font-semibold mb-4">Summarized Papers</h2>`;
+
+            if (papers.length === 0) {
+                container.innerHTML += `<p class="text-slate-400">No papers found for this topic.</p>`;
+                return;
+            }
+
+            papers.forEach(paper => {
+                const paperDiv = document.createElement('div');
+                paperDiv.classList.add('bg-slate-700', 'p-6', 'rounded-lg', 'shadow-md');
+                paperDiv.innerHTML = `
+                    <h3 class="text-xl font-bold text-blue-400 mb-2">${paper.title}</h3>
+                    <p class="text-slate-300 mb-3">${paper.summary}</p>
+                    <a href="${paper.link}" target="_blank" class="text-blue-400 hover:text-blue-300 transition duration-200 text-sm">Read full paper &rarr;</a>
+                `;
+                container.appendChild(paperDiv);
+            });
+        }
+    </script>
+</body>
+</html>
